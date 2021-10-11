@@ -1,8 +1,10 @@
 import express from "express";
+import cors from "cors";
 import dayjs from "dayjs";
 
 const router = express();
 
+router.use(cors());
 router.use(express.json());
 
 // Global variables
@@ -13,7 +15,7 @@ const participants = [
   },
 ];
 
-const messages = [
+let messages = [
   {
     from: "João",
     to: "Todos",
@@ -29,23 +31,14 @@ router.get("/participants", (req, res) => {
 });
 
 router.get("/messages", (req, res) => {
-  const user = req.headers.from;
+  const user = req.headers.user;
   const limit = req.query.limit;
-  const userMsgs = messages.filter((message) => {
-    if (message.type === "private_message" && user !== message.to) {
-      return false;
-    } else {
-      return true;
-    }
-  });
 
-  return res
-    .status(200)
-    .send(
-      userMsgs.length > limit
-        ? userMsgs.slice(userMsgs.length - limit)
-        : userMsgs
-    );
+  const msgs = messages.filter((message) => message.to !== user);
+
+  return msgs.length > limit
+    ? res.status(200).send(msgs.slice(limit))
+    : res.status(200).send(msgs);
 });
 
 // Methods post
@@ -65,39 +58,61 @@ router.post("/participants", (req, res) => {
       to: "Todos",
       text: "Entra na sala...",
       type: "status",
-      time: dayjs(
-        `${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`
-      ).format("HH:MM:SS"),
+      time: dayjs().format("hh:mm:ss"),
     });
     return res.status(200).send(participants);
   }
 });
 
 router.post("/messages", (req, res) => {
-  const from = req.headers.from;
+  const from = req.headers.user;
   const { to, text, type } = req.body;
 
   if (
-    to === "" ||
-    text === "" ||
+    to.length === 0 ||
+    text.length === 0 ||
     !["message", "private_message"].includes(type) ||
-    !participants.some((participant) => participants.name === from)
+    !participants.some((participant) => participant.name === from)
   ) {
     return res.status(400).send();
   } else {
-    const time = new Date();
     messages.push({
       from,
       to,
       text,
       type,
-      time: dayjs(
-        `${time.getHours()}:${time.getMinutes()}:${time.getSeconds()}`
-      ).format("HH:MM:SS"),
+      time: dayjs().format("hh:mm:ss"),
     });
     return res.status(200).send(messages);
   }
 });
+
+router.post("/status", (req, res) => {
+  const user = req.headers.user;
+  let isActive = false;
+  for (let i = 0; i < participants.length; i++) {
+    if (participants[i].name === user) {
+      isActive = true;
+      participants[i].lastStatus = Date.now();
+    }
+  }
+  return isActive ? res.status(200).send(participants) : res.status(400).send();
+});
+
+setTimeout(() => {
+  participants.forEach((participant, index) => {
+    if (Date.now() - participants.lastStatus > 10) {
+      participants.splice(index, 1);
+      messages.push({
+        from: participant.name,
+        to: "Todos",
+        text: "sai da sala...",
+        type: "status",
+        time: dayjs().format("hh:mm:ss"),
+      });
+    }
+  });
+}, 15000);
 
 // Method to listen any changes
 router.listen(4000);
