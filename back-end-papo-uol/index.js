@@ -1,6 +1,8 @@
 import express from "express";
 import cors from "cors";
 import dayjs from "dayjs";
+import { stripHtml } from "string-strip-html";
+import Trim from "trim";
 
 const router = express();
 
@@ -43,7 +45,7 @@ router.get("/messages", (req, res) => {
 
 // Methods post
 router.post("/participants", (req, res) => {
-  const { name } = req.body;
+  const name = Trim(stripHtml(req.body.name).result);
 
   if (name === "") {
     return res.status(400).send();
@@ -77,10 +79,10 @@ router.post("/messages", (req, res) => {
     return res.status(400).send();
   } else {
     messages.push({
-      from,
-      to,
-      text,
-      type,
+      from: to,
+      to: Trim(stripHtml(to).result),
+      text: Trim(stripHtml(text).result),
+      type: Trim(stripHtml(type).result),
       time: dayjs().format("hh:mm:ss"),
     });
     return res.status(200).send(messages);
