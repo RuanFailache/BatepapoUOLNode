@@ -36,10 +36,14 @@ router.get("/messages", (req, res) => {
   const user = req.headers.user;
   const limit = req.query.limit;
 
-  const msgs = messages.filter((message) => message.to !== user);
+  const msgs = messages.filter((message) => {
+    const privateMessage = message.type === "private_message";
+    const userMessage = message.to === user || message.from === user;
+    return !privateMessage || userMessage;
+  });
 
   return msgs.length > limit
-    ? res.status(200).send(msgs.slice(limit))
+    ? res.status(200).send(msgs.slice(-limit))
     : res.status(200).send(msgs);
 });
 
@@ -74,12 +78,12 @@ router.post("/messages", (req, res) => {
     to.length === 0 ||
     text.length === 0 ||
     !["message", "private_message"].includes(type) ||
-    !participants.some((participant) => participant.name === from)
+    !participants.find((participant) => participant.name === from)
   ) {
     return res.status(400).send();
   } else {
     messages.push({
-      from: to,
+      from,
       to: Trim(stripHtml(to).result),
       text: Trim(stripHtml(text).result),
       type: Trim(stripHtml(type).result),
@@ -103,7 +107,7 @@ router.post("/status", (req, res) => {
 
 setTimeout(() => {
   participants.forEach((participant, index) => {
-    if (Date.now() - participants.lastStatus > 10) {
+    if ((Date.now() - participants.lastStatus) / 1000 > 10) {
       participants.splice(index, 1);
       messages.push({
         from: participant.name,
